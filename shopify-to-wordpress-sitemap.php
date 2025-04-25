@@ -33,6 +33,9 @@ function shopify_sitemap_activate()
 
   // Flush rewrite rules
   flush_rewrite_rules();
+
+  // Set transient for admin notice
+  set_transient('shopify_sitemap_flush_notice', true, 60);
 }
 
 // Plugin deactivation
@@ -40,4 +43,21 @@ function shopify_sitemap_deactivate()
 {
   flush_rewrite_rules();
   delete_transient('shopify_sitemap_data');
+  delete_transient('shopify_sitemap_flush_notice');
 }
+
+/**
+ * Show admin notice after activation to refresh permalinks
+ */
+function shopify_sitemap_admin_notice()
+{
+  if (get_transient('shopify_sitemap_flush_notice')) {
+?>
+    <div class="notice notice-info is-dismissible">
+      <p><?php _e('Shopify Sitemap Integrator: For the sitemap to work correctly, please <a href="options-permalink.php">visit the Permalinks page</a> and click "Save Changes" to refresh your site\'s rewrite rules.', 'shopify-sitemap-integrator'); ?></p>
+    </div>
+<?php
+    delete_transient('shopify_sitemap_flush_notice');
+  }
+}
+add_action('admin_notices', 'shopify_sitemap_admin_notice');
