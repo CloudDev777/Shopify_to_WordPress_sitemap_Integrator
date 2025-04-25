@@ -19,6 +19,9 @@ class Shopify_Sitemap_Provider extends WP_Sitemaps_Provider
   public function __construct()
   {
     $this->object_subtype_route_base = 'sitemap';
+
+    // Custom sitemap name
+    add_filter('wp_sitemaps_shopify_filename', array($this, 'custom_sitemap_filename'));
   }
 
   /**
@@ -113,5 +116,22 @@ class Shopify_Sitemap_Provider extends WP_Sitemaps_Provider
   public function get_object_subtypes()
   {
     return array();
+  }
+
+  /**
+   * Filter to customize the sitemap filename.
+   *
+   * @param string $filename Default filename.
+   * @return string Custom filename.
+   */
+  public function custom_sitemap_filename($filename)
+  {
+    $custom_filename = get_option('shopify_sitemap_output_filename', SHOPIFY_SITEMAP_INTEGRATOR_DEFAULT_OUTPUT);
+
+    if (!empty($custom_filename)) {
+      return $custom_filename;
+    }
+
+    return $filename;
   }
 }
