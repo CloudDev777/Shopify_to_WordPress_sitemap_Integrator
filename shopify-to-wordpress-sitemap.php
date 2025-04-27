@@ -4,6 +4,8 @@
  * Plugin Name: Shopify Sitemap Integrator
  * Description: Fetches a Shopify sitemap and adds it to your WordPress site.
  * Version: 1.0.0
+ * License: GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  */
 
 // If this file is called directly, abort.
@@ -54,7 +56,7 @@ function shopify_sitemap_admin_notice()
   if (get_transient('shopify_sitemap_flush_notice')) {
 ?>
     <div class="notice notice-info is-dismissible">
-      <p><?php _e('Shopify Sitemap Integrator: For the sitemap to work correctly, please <a href="options-permalink.php">visit the Permalinks page</a> and click "Save Changes" to refresh your site\'s rewrite rules.', 'shopify-sitemap-integrator'); ?></p>
+      <p><?php esc_html_e('Shopify Sitemap Integrator: For the sitemap to work correctly, please <a href="options-permalink.php">visit the Permalinks page</a> and click "Save Changes" to refresh your site\'s rewrite rules.', 'shopify-to-wordpress-sitemap'); ?></p>
     </div>
 <?php
     delete_transient('shopify_sitemap_flush_notice');

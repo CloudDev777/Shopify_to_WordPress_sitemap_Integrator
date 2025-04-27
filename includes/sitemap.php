@@ -46,7 +46,7 @@ function shopify_sitemap_generate_xml()
     // Fallback if no data
     echo "\t<url>\n";
     echo "\t\t<loc>" . esc_url(home_url()) . "</loc>\n";
-    echo "\t\t<lastmod>" . date('Y-m-d') . "</lastmod>\n";
+    echo "\t\t<lastmod>" . esc_html(gmdate('Y-m-d')) . "</lastmod>\n";
     echo "\t\t<changefreq>daily</changefreq>\n";
     echo "\t\t<priority>1.0</priority>\n";
     echo "\t</url>\n";

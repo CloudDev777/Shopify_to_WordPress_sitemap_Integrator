@@ -32,7 +32,7 @@ function shopify_sitemap_settings_page()
     </form>
     <h2>Manual Update</h2>
     <p>Click the button below to update the sitemap immediately.</p>
-    <a href="<?php echo wp_nonce_url(admin_url('options-general.php?page=shopify-sitemap&action=update'), 'shopify_sitemap_update'); ?>" class="button button-primary">Update Sitemap Now</a>
+    <a href="<?php echo esc_url(wp_nonce_url(admin_url('options-general.php?page=shopify-sitemap&action=update'), 'shopify_sitemap_update')); ?>" class="button button-primary">Update Sitemap Now</a>
   </div>
 <?php
 }
@@ -41,9 +41,32 @@ function shopify_sitemap_settings_page()
 add_action('admin_init', 'shopify_sitemap_register_settings');
 function shopify_sitemap_register_settings()
 {
-  register_setting('shopify_sitemap_settings', 'shopify_sitemap_domain');
-  register_setting('shopify_sitemap_settings', 'shopify_sitemap_path');
-  register_setting('shopify_sitemap_settings', 'shopify_sitemap_output_filename');
+  register_setting(
+    'shopify_sitemap_settings',
+    'shopify_sitemap_domain',
+    array(
+      'sanitize_callback' => 'sanitize_text_field',
+      'default' => '',
+    )
+  );
+
+  register_setting(
+    'shopify_sitemap_settings',
+    'shopify_sitemap_path',
+    array(
+      'sanitize_callback' => 'sanitize_text_field',
+      'default' => 'sitemap.xml',
+    )
+  );
+
+  register_setting(
+    'shopify_sitemap_settings',
+    'shopify_sitemap_output_filename',
+    array(
+      'sanitize_callback' => 'sanitize_file_name',
+      'default' => SHOPIFY_SITEMAP_DEFAULT_OUTPUT,
+    )
+  );
 
   add_settings_section(
     'shopify_sitemap_general',
@@ -114,19 +137,23 @@ function shopify_sitemap_admin_actions()
   if (
     isset($_GET['page']) && $_GET['page'] === 'shopify-sitemap' &&
     isset($_GET['action']) && $_GET['action'] === 'update' &&
-    isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'shopify_sitemap_update')
+    isset($_GET['_wpnonce'])
   ) {
+    // Sanitize and validate the nonce
+    $nonce = sanitize_text_field(wp_unslash($_GET['_wpnonce']));
 
-    // Run update function from sitemap.php
-    $updated = shopify_sitemap_update();
+    if (wp_verify_nonce($nonce, 'shopify_sitemap_update')) {
+      // Run update function from sitemap.php
+      $updated = shopify_sitemap_update();
 
-    // Redirect back with status
-    $redirect = add_query_arg(array(
-      'page' => 'shopify-sitemap',
-      'updated' => $updated ? 'true' : 'false'
-    ), admin_url('options-general.php'));
+      // Redirect back with status
+      $redirect = add_query_arg(array(
+        'page' => 'shopify-sitemap',
+        'updated' => $updated ? 'true' : 'false'
+      ), admin_url('options-general.php'));
 
-    wp_redirect($redirect);
-    exit;
+      wp_redirect($redirect);
+      exit;
+    }
   }
 }

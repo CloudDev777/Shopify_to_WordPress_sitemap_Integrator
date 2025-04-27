@@ -61,6 +61,18 @@ If you receive a "Page not found" error when trying to access your sitemap, try:
 3. Try clicking "Update Sitemap Now" on the plugin settings page
 4. Check your Shopify store to ensure the original sitemap is accessible
 
+## License
+
+This plugin is licensed under the [GPL v2 or later](http://www.gnu.org/licenses/gpl-2.0.html).
+
 ## Author
 
 Created by [Gabriel Kanev](https://gkanev.com)
+
+## Tested up to
+
+WordPress 6.4
+
+## Stable Tag
+
+1.0.0
