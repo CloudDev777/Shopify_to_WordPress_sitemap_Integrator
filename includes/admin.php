@@ -26,6 +26,9 @@ function shopify_sitemap_settings_page()
 ?>
   <div class="wrap">
     <h1>Shopify Sitemap Integrator</h1>
+    <div class="shopify-sitemap-buttons" style="margin: 10px 0 20px;">
+      <a href="<?php echo esc_url($sitemap_url); ?>" class="button" target="_blank"><?php _e('View Sitemap', 'shopify-to-wordpress-sitemap'); ?></a>
+    </div>
 
     <form method="post" action="options.php">
       <?php
@@ -184,7 +187,7 @@ function shopify_sitemap_admin_actions()
       delete_transient('shopify_sitemap_is_index');
 
       // Run update function from sitemap.php
-      $updated = shopify_sitemap_update();
+      $updated = function_exists('shopify_sitemap_update') ? shopify_sitemap_update() : false;
 
       // Redirect back with status
       $redirect = add_query_arg(array(
@@ -192,7 +195,7 @@ function shopify_sitemap_admin_actions()
         'updated' => $updated ? 'true' : 'false'
       ), admin_url('options-general.php'));
 
-      wp_redirect($redirect);
+      wp_safe_redirect($redirect);
       exit;
     }
   }

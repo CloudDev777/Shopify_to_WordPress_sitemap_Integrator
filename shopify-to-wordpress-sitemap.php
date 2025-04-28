@@ -3,12 +3,13 @@
 /**
  * Plugin Name: Shopify Sitemap Integrator
  * Description: Fetches a Shopify sitemap and adds it to your WordPress site.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Gabriel Kanev
  * Author URI: https://gkanev.com
  * Plugin URI: https://github.com/MrGKanev/Shopify-to-WordPress-sitemap
  * License: GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
+ * Requires PHP: 7.4
  */
 
 // If this file is called directly, abort.
@@ -19,6 +20,7 @@ if (!defined('WPINC')) {
 // Define plugin constants
 define('SHOPIFY_SITEMAP_DIR', plugin_dir_path(__FILE__));
 define('SHOPIFY_SITEMAP_DEFAULT_OUTPUT', 'store.xml');
+define('SHOPIFY_SITEMAP_VERSION', '1.1.0');
 
 // Include required files
 require_once SHOPIFY_SITEMAP_DIR . 'includes/admin.php';
@@ -38,7 +40,9 @@ function shopify_sitemap_activate()
   add_option('shopify_sitemap_flatten', 'no');
 
   // Add rewrite rules
-  shopify_sitemap_add_rewrite_rules();
+  if (function_exists('shopify_sitemap_add_rewrite_rules')) {
+    shopify_sitemap_add_rewrite_rules();
+  }
 
   // Flush rewrite rules
   flush_rewrite_rules();
@@ -102,7 +106,7 @@ function shopify_sitemap_display_url()
 
   $status_html = '';
 
-  // Check if the sitemap transient exists
+  // Check if the sitemap transient exists - PHP 8.1 safe
   $has_data = get_transient('shopify_sitemap_data') !== false;
   $is_index = get_transient('shopify_sitemap_is_index');
   $flatten = get_option('shopify_sitemap_flatten', 'no') === 'yes';
@@ -158,6 +162,10 @@ function shopify_sitemap_flush_rules()
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'shopify_sitemap_plugin_action_links');
 function shopify_sitemap_plugin_action_links($links)
 {
+  if (!is_array($links)) {
+    $links = array();
+  }
+
   $settings_link = '<a href="' . admin_url('options-general.php?page=shopify-sitemap') . '">' . __('Settings', 'shopify-to-wordpress-sitemap') . '</a>';
 
   // Get the sitemap URL

@@ -71,8 +71,4 @@ Created by [Gabriel Kanev](https://gkanev.com)
 
 ## Tested up to
 
-WordPress 6.4
-
-## Stable Tag
-
-1.0.0
+WordPress 6.8

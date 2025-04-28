@@ -51,7 +51,7 @@ function shopify_sitemap_generate_xml()
     if (!empty($sitemap_data) && is_array($sitemap_data)) {
       foreach ($sitemap_data as $sitemap) {
         echo "\t<sitemap>\n";
-        echo "\t\t<loc>" . esc_url($sitemap['loc']) . "</loc>\n";
+        echo "\t\t<loc>" . esc_url(isset($sitemap['loc']) ? $sitemap['loc'] : '') . "</loc>\n";
 
         if (!empty($sitemap['lastmod'])) {
           echo "\t\t<lastmod>" . esc_html($sitemap['lastmod']) . "</lastmod>\n";
@@ -74,7 +74,7 @@ function shopify_sitemap_generate_xml()
 
       foreach ($sitemap_data as $item) {
         echo "\t<url>\n";
-        echo "\t\t<loc>" . esc_url($item['loc']) . "</loc>\n";
+        echo "\t\t<loc>" . esc_url(isset($item['loc']) ? $item['loc'] : '') . "</loc>\n";
 
         if (!empty($item['lastmod'])) {
           echo "\t\t<lastmod>" . esc_html($item['lastmod']) . "</lastmod>\n";
@@ -168,7 +168,7 @@ function shopify_sitemap_update()
 
   // First, check if this is a sitemap index or regular sitemap
   $is_index = false;
-  if (strpos($xml, '<sitemapindex') !== false) {
+  if (is_string($xml) && strpos($xml, '<sitemapindex') !== false) {
     $is_index = true;
     if (defined('WP_DEBUG') && WP_DEBUG) {
       error_log('Shopify Sitemap: Detected sitemap index');
@@ -235,6 +235,13 @@ function shopify_sitemap_flatten_index($sitemap_entries)
 {
   $all_urls = array();
 
+  if (!is_array($sitemap_entries)) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Invalid sitemap entries passed to flatten_index');
+    }
+    return $all_urls;
+  }
+
   if (defined('WP_DEBUG') && WP_DEBUG) {
     error_log('Shopify Sitemap: Starting flattening of ' . count($sitemap_entries) . ' sitemaps');
   }
@@ -292,7 +299,7 @@ function shopify_sitemap_flatten_index($sitemap_entries)
  */
 function shopify_sitemap_parse_index($xml)
 {
-  if (empty($xml)) {
+  if (empty($xml) || !is_string($xml)) {
     return array();
   }
 
@@ -308,21 +315,23 @@ function shopify_sitemap_parse_index($xml)
       error_log('Shopify Sitemap: This appears to be a sitemap index file with ' . $sitemap_nodes->length . ' sitemaps');
     }
 
-    foreach ($sitemap_nodes as $sitemap_node) {
-      $loc_nodes = $sitemap_node->getElementsByTagName('loc');
+    if ($sitemap_nodes->length > 0) {
+      foreach ($sitemap_nodes as $sitemap_node) {
+        $loc_nodes = $sitemap_node->getElementsByTagName('loc');
 
-      if ($loc_nodes->length > 0) {
-        $sitemap = array(
-          'loc' => $loc_nodes->item(0)->nodeValue,
-          'lastmod' => '',
-        );
+        if ($loc_nodes->length > 0) {
+          $sitemap = array(
+            'loc' => $loc_nodes->item(0)->nodeValue,
+            'lastmod' => '',
+          );
 
-        $lastmod_nodes = $sitemap_node->getElementsByTagName('lastmod');
-        if ($lastmod_nodes->length > 0) {
-          $sitemap['lastmod'] = $lastmod_nodes->item(0)->nodeValue;
+          $lastmod_nodes = $sitemap_node->getElementsByTagName('lastmod');
+          if ($lastmod_nodes->length > 0) {
+            $sitemap['lastmod'] = $lastmod_nodes->item(0)->nodeValue;
+          }
+
+          $sitemaps[] = $sitemap;
         }
-
-        $sitemaps[] = $sitemap;
       }
     }
   } else {
@@ -344,7 +353,7 @@ function shopify_sitemap_parse_index($xml)
  */
 function shopify_sitemap_parse_sitemap($xml)
 {
-  if (empty($xml)) {
+  if (empty($xml) || !is_string($xml)) {
     return array();
   }
 
@@ -360,33 +369,35 @@ function shopify_sitemap_parse_sitemap($xml)
       error_log('Shopify Sitemap: Found ' . $url_nodes->length . ' URL nodes in XML');
     }
 
-    foreach ($url_nodes as $url_node) {
-      $loc_nodes = $url_node->getElementsByTagName('loc');
+    if ($url_nodes->length > 0) {
+      foreach ($url_nodes as $url_node) {
+        $loc_nodes = $url_node->getElementsByTagName('loc');
 
-      if ($loc_nodes->length > 0) {
-        $url = array(
-          'loc' => $loc_nodes->item(0)->nodeValue,
-          'lastmod' => '',
-          'changefreq' => '',
-          'priority' => '',
-        );
+        if ($loc_nodes->length > 0) {
+          $url = array(
+            'loc' => $loc_nodes->item(0)->nodeValue,
+            'lastmod' => '',
+            'changefreq' => '',
+            'priority' => '',
+          );
 
-        $lastmod_nodes = $url_node->getElementsByTagName('lastmod');
-        if ($lastmod_nodes->length > 0) {
-          $url['lastmod'] = $lastmod_nodes->item(0)->nodeValue;
+          $lastmod_nodes = $url_node->getElementsByTagName('lastmod');
+          if ($lastmod_nodes->length > 0) {
+            $url['lastmod'] = $lastmod_nodes->item(0)->nodeValue;
+          }
+
+          $changefreq_nodes = $url_node->getElementsByTagName('changefreq');
+          if ($changefreq_nodes->length > 0) {
+            $url['changefreq'] = $changefreq_nodes->item(0)->nodeValue;
+          }
+
+          $priority_nodes = $url_node->getElementsByTagName('priority');
+          if ($priority_nodes->length > 0) {
+            $url['priority'] = $priority_nodes->item(0)->nodeValue;
+          }
+
+          $urls[] = $url;
         }
-
-        $changefreq_nodes = $url_node->getElementsByTagName('changefreq');
-        if ($changefreq_nodes->length > 0) {
-          $url['changefreq'] = $changefreq_nodes->item(0)->nodeValue;
-        }
-
-        $priority_nodes = $url_node->getElementsByTagName('priority');
-        if ($priority_nodes->length > 0) {
-          $url['priority'] = $priority_nodes->item(0)->nodeValue;
-        }
-
-        $urls[] = $url;
       }
     }
   } else {
