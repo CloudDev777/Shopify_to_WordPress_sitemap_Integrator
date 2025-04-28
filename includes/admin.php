@@ -30,6 +30,9 @@ function shopify_sitemap_settings_page()
       submit_button();
       ?>
     </form>
+
+    <?php do_action('shopify_sitemap_after_settings'); ?>
+
     <h2>Manual Update</h2>
     <p>Click the button below to update the sitemap immediately.</p>
     <a href="<?php echo esc_url(wp_nonce_url(admin_url('options-general.php?page=shopify-sitemap&action=update'), 'shopify_sitemap_update')); ?>" class="button button-primary">Update Sitemap Now</a>

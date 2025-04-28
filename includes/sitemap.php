@@ -9,50 +9,103 @@
  */
 function shopify_sitemap_generate_xml()
 {
+  // Debug information
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Generating XML');
+  }
+
   $sitemap_data = get_transient('shopify_sitemap_data');
+  $is_index = get_transient('shopify_sitemap_is_index');
 
   if (empty($sitemap_data)) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: No transient data found, attempting to update');
+    }
+
     // Try to update the sitemap
-    shopify_sitemap_update();
+    $update_result = shopify_sitemap_update();
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Update result: ' . ($update_result ? 'success' : 'failed'));
+    }
+
     $sitemap_data = get_transient('shopify_sitemap_data');
+    $is_index = get_transient('shopify_sitemap_is_index');
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: After update, data exists: ' . (!empty($sitemap_data) ? 'yes' : 'no'));
+      error_log('Shopify Sitemap: Is sitemap index: ' . ($is_index ? 'yes' : 'no'));
+    }
   }
 
   header('Content-Type: application/xml; charset=UTF-8');
-
   ob_start();
-  echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-  echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
-  if (!empty($sitemap_data) && is_array($sitemap_data)) {
-    foreach ($sitemap_data as $item) {
+  if ($is_index) {
+    // Output sitemap index
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+    echo '<!-- This is a sitemap index from your Shopify store -->' . "\n";
+
+    if (!empty($sitemap_data) && is_array($sitemap_data)) {
+      foreach ($sitemap_data as $sitemap) {
+        echo "\t<sitemap>\n";
+        echo "\t\t<loc>" . esc_url($sitemap['loc']) . "</loc>\n";
+
+        if (!empty($sitemap['lastmod'])) {
+          echo "\t\t<lastmod>" . esc_html($sitemap['lastmod']) . "</lastmod>\n";
+        }
+
+        echo "\t</sitemap>\n";
+      }
+    }
+
+    echo '</sitemapindex>';
+  } else {
+    // Output standard sitemap
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+    if (!empty($sitemap_data) && is_array($sitemap_data)) {
+      if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Shopify Sitemap: Found ' . count($sitemap_data) . ' URLs in data');
+      }
+
+      foreach ($sitemap_data as $item) {
+        echo "\t<url>\n";
+        echo "\t\t<loc>" . esc_url($item['loc']) . "</loc>\n";
+
+        if (!empty($item['lastmod'])) {
+          echo "\t\t<lastmod>" . esc_html($item['lastmod']) . "</lastmod>\n";
+        }
+
+        if (!empty($item['changefreq'])) {
+          echo "\t\t<changefreq>" . esc_html($item['changefreq']) . "</changefreq>\n";
+        }
+
+        if (!empty($item['priority'])) {
+          echo "\t\t<priority>" . esc_html($item['priority']) . "</priority>\n";
+        }
+
+        echo "\t</url>\n";
+      }
+    } else {
+      if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Shopify Sitemap: No sitemap data, using fallback');
+      }
+
+      // Fallback if no data
       echo "\t<url>\n";
-      echo "\t\t<loc>" . esc_url($item['loc']) . "</loc>\n";
-
-      if (!empty($item['lastmod'])) {
-        echo "\t\t<lastmod>" . esc_html($item['lastmod']) . "</lastmod>\n";
-      }
-
-      if (!empty($item['changefreq'])) {
-        echo "\t\t<changefreq>" . esc_html($item['changefreq']) . "</changefreq>\n";
-      }
-
-      if (!empty($item['priority'])) {
-        echo "\t\t<priority>" . esc_html($item['priority']) . "</priority>\n";
-      }
-
+      echo "\t\t<loc>" . esc_url(home_url()) . "</loc>\n";
+      echo "\t\t<lastmod>" . esc_html(gmdate('Y-m-d')) . "</lastmod>\n";
+      echo "\t\t<changefreq>daily</changefreq>\n";
+      echo "\t\t<priority>1.0</priority>\n";
       echo "\t</url>\n";
     }
-  } else {
-    // Fallback if no data
-    echo "\t<url>\n";
-    echo "\t\t<loc>" . esc_url(home_url()) . "</loc>\n";
-    echo "\t\t<lastmod>" . esc_html(gmdate('Y-m-d')) . "</lastmod>\n";
-    echo "\t\t<changefreq>daily</changefreq>\n";
-    echo "\t\t<priority>1.0</priority>\n";
-    echo "\t</url>\n";
+
+    echo '</urlset>';
   }
 
-  echo '</urlset>';
   return ob_get_clean();
 }
 
@@ -64,35 +117,142 @@ function shopify_sitemap_update()
   $domain = get_option('shopify_sitemap_domain', '');
   $path = get_option('shopify_sitemap_path', 'sitemap.xml');
 
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Attempting to update sitemap from ' . $domain . '/' . $path);
+  }
+
   if (empty($domain)) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: No domain configured');
+    }
     return false;
   }
 
   // Fetch the sitemap
   $response = wp_remote_get('https://' . $domain . '/' . $path, array(
     'timeout' => 30,
+    'user-agent' => 'WordPress/Shopify-Sitemap-Integrator'
   ));
 
-  if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+  if (is_wp_error($response)) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: WP Error fetching sitemap: ' . $response->get_error_message());
+    }
+    return false;
+  }
+
+  $status_code = wp_remote_retrieve_response_code($response);
+  if ($status_code !== 200) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: HTTP error fetching sitemap. Status code: ' . $status_code);
+    }
     return false;
   }
 
   $xml = wp_remote_retrieve_body($response);
-  $sitemap_data = shopify_sitemap_parse_xml($xml);
+
+  if (empty($xml)) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Empty response body from Shopify');
+    }
+    return false;
+  }
+
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Fetched XML body length: ' . strlen($xml));
+    error_log('Shopify Sitemap: First 100 chars: ' . substr($xml, 0, 100));
+  }
+
+  // First, check if this is a sitemap index or regular sitemap
+  $is_index = false;
+  if (strpos($xml, '<sitemapindex') !== false) {
+    $is_index = true;
+  }
+
+  // Parse the XML accordingly
+  if ($is_index) {
+    $sitemap_data = shopify_sitemap_parse_index($xml);
+    set_transient('shopify_sitemap_is_index', true, DAY_IN_SECONDS);
+  } else {
+    $sitemap_data = shopify_sitemap_parse_sitemap($xml);
+    set_transient('shopify_sitemap_is_index', false, DAY_IN_SECONDS);
+  }
+
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Parsed ' . count($sitemap_data) . ' entries from XML (type: ' . ($is_index ? 'index' : 'sitemap') . ')');
+  }
 
   // Store the data
   if (!empty($sitemap_data)) {
     set_transient('shopify_sitemap_data', $sitemap_data, DAY_IN_SECONDS);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Successfully set transient with sitemap data');
+    }
     return true;
   }
 
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Failed to set transient - no sitemap data found');
+  }
   return false;
 }
 
 /**
- * Parse sitemap XML.
+ * Parse sitemap index XML.
  */
-function shopify_sitemap_parse_xml($xml)
+function shopify_sitemap_parse_index($xml)
+{
+  if (empty($xml)) {
+    return array();
+  }
+
+  libxml_use_internal_errors(true);
+
+  $sitemaps = array();
+  $dom = new DOMDocument();
+
+  if (@$dom->loadXML($xml)) {
+    $sitemap_nodes = $dom->getElementsByTagName('sitemap');
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: This appears to be a sitemap index file with ' . $sitemap_nodes->length . ' sitemaps');
+    }
+
+    foreach ($sitemap_nodes as $sitemap_node) {
+      $loc_nodes = $sitemap_node->getElementsByTagName('loc');
+
+      if ($loc_nodes->length > 0) {
+        $sitemap = array(
+          'loc' => $loc_nodes->item(0)->nodeValue,
+          'lastmod' => '',
+        );
+
+        $lastmod_nodes = $sitemap_node->getElementsByTagName('lastmod');
+        if ($lastmod_nodes->length > 0) {
+          $sitemap['lastmod'] = $lastmod_nodes->item(0)->nodeValue;
+        }
+
+        $sitemaps[] = $sitemap;
+      }
+    }
+  } else {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      $errors = libxml_get_errors();
+      foreach ($errors as $error) {
+        error_log('Shopify Sitemap XML Error: ' . $error->message);
+      }
+    }
+  }
+
+  libxml_clear_errors();
+
+  return $sitemaps;
+}
+
+/**
+ * Parse regular sitemap XML.
+ */
+function shopify_sitemap_parse_sitemap($xml)
 {
   if (empty($xml)) {
     return array();
@@ -105,6 +265,10 @@ function shopify_sitemap_parse_xml($xml)
 
   if (@$dom->loadXML($xml)) {
     $url_nodes = $dom->getElementsByTagName('url');
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Found ' . $url_nodes->length . ' URL nodes in XML');
+    }
 
     foreach ($url_nodes as $url_node) {
       $loc_nodes = $url_node->getElementsByTagName('loc');
@@ -133,6 +297,13 @@ function shopify_sitemap_parse_xml($xml)
         }
 
         $urls[] = $url;
+      }
+    }
+  } else {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      $errors = libxml_get_errors();
+      foreach ($errors as $error) {
+        error_log('Shopify Sitemap XML Error: ' . $error->message);
       }
     }
   }
