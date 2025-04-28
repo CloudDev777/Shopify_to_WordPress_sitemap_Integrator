@@ -20,9 +20,13 @@ function shopify_sitemap_admin_menu()
 // Settings page content
 function shopify_sitemap_settings_page()
 {
+  // Get sitemap URL for the view button
+  $output_filename = get_option('shopify_sitemap_output_filename', SHOPIFY_SITEMAP_DEFAULT_OUTPUT);
+  $sitemap_url = home_url('/' . $output_filename);
 ?>
   <div class="wrap">
     <h1>Shopify Sitemap Integrator</h1>
+
     <form method="post" action="options.php">
       <?php
       settings_fields('shopify_sitemap_settings');
@@ -35,7 +39,10 @@ function shopify_sitemap_settings_page()
 
     <h2>Manual Update</h2>
     <p>Click the button below to update the sitemap immediately.</p>
-    <a href="<?php echo esc_url(wp_nonce_url(admin_url('options-general.php?page=shopify-sitemap&action=update'), 'shopify_sitemap_update')); ?>" class="button button-primary">Update Sitemap Now</a>
+    <div class="shopify-sitemap-buttons">
+      <a href="<?php echo esc_url(wp_nonce_url(admin_url('options-general.php?page=shopify-sitemap&action=update'), 'shopify_sitemap_update')); ?>" class="button button-primary">Update Sitemap Now</a>
+      <a href="<?php echo esc_url($sitemap_url); ?>" class="button" target="_blank" style="margin-left: 10px;"><?php _e('View Sitemap', 'shopify-to-wordpress-sitemap'); ?></a>
+    </div>
   </div>
 <?php
 }
