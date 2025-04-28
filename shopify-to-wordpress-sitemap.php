@@ -22,6 +22,68 @@ define('SHOPIFY_SITEMAP_DIR', plugin_dir_path(__FILE__));
 define('SHOPIFY_SITEMAP_DEFAULT_OUTPUT', 'store.xml');
 define('SHOPIFY_SITEMAP_VERSION', '1.1.0');
 
+/**
+ * Enhanced debug logging for local environments
+ * 
+ * @param string $message The message to log
+ * @return void
+ */
+function shopify_sitemap_log($message)
+{
+  // Check if we're in debug mode
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    // Get the current domain
+    $domain = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+
+    // Check if we're on a local domain (.local, localhost, etc.)
+    $is_local = (
+      strpos($domain, '.local') !== false ||
+      strpos($domain, 'localhost') !== false ||
+      strpos($domain, '.test') !== false ||
+      strpos($domain, '.dev') !== false ||
+      $domain === '127.0.0.1'
+    );
+
+    // For local domains, also output to screen if WP_DEBUG_DISPLAY is enabled
+    if ($is_local && defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY) {
+      // Only show debug output for admin users on local environments
+      if (current_user_can('manage_options')) {
+        // Collect debug messages to show at the bottom of the page
+        global $shopify_sitemap_debug_messages;
+        if (!isset($shopify_sitemap_debug_messages) || !is_array($shopify_sitemap_debug_messages)) {
+          $shopify_sitemap_debug_messages = array();
+        }
+        $shopify_sitemap_debug_messages[] = '[Shopify Sitemap] ' . $message;
+      }
+    }
+
+    // Always log to the error log
+    error_log('[Shopify Sitemap] ' . $message);
+  }
+}
+
+// Hook to display debug messages at the bottom of admin pages
+add_action('admin_footer', 'shopify_sitemap_display_debug_messages');
+function shopify_sitemap_display_debug_messages()
+{
+  // Only proceed if we're in debug mode and for admin users
+  if (!defined('WP_DEBUG') || !WP_DEBUG || !defined('WP_DEBUG_DISPLAY') || !WP_DEBUG_DISPLAY || !current_user_can('manage_options')) {
+    return;
+  }
+
+  global $shopify_sitemap_debug_messages;
+  if (!empty($shopify_sitemap_debug_messages) && is_array($shopify_sitemap_debug_messages)) {
+    echo '<div class="shopify-sitemap-debug" style="margin-top:20px; padding:10px; background:#f8f8f8; border:1px solid #ddd; color:#444;">';
+    echo '<h3>Shopify Sitemap Debug Log</h3>';
+    echo '<pre style="font-size:12px; line-height:1.5; max-height:300px; overflow:auto;">';
+    foreach ($shopify_sitemap_debug_messages as $msg) {
+      echo esc_html($msg) . "\n";
+    }
+    echo '</pre>';
+    echo '</div>';
+  }
+}
+
 // Include required files
 require_once SHOPIFY_SITEMAP_DIR . 'includes/admin.php';
 require_once SHOPIFY_SITEMAP_DIR . 'includes/sitemap.php';
@@ -50,9 +112,7 @@ function shopify_sitemap_activate()
   // Set transient for admin notice
   set_transient('shopify_sitemap_flush_notice', true, 60);
 
-  if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('Shopify Sitemap: Plugin activated, rewrite rules flushed');
-  }
+  shopify_sitemap_log('Plugin activated, rewrite rules flushed');
 }
 
 // Plugin deactivation
@@ -63,9 +123,7 @@ function shopify_sitemap_deactivate()
   delete_transient('shopify_sitemap_is_index');
   delete_transient('shopify_sitemap_flush_notice');
 
-  if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('Shopify Sitemap: Plugin deactivated, transients deleted');
-  }
+  shopify_sitemap_log('Plugin deactivated, transients deleted');
 }
 
 /**
@@ -152,9 +210,7 @@ add_action('shopify_sitemap_after_settings', 'shopify_sitemap_display_url');
 add_action('permalink_structure_changed', 'shopify_sitemap_flush_rules');
 function shopify_sitemap_flush_rules()
 {
-  if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('Shopify Sitemap: Permalink structure changed, flushing rules');
-  }
+  shopify_sitemap_log('Permalink structure changed, flushing rules');
   flush_rewrite_rules();
 }
 

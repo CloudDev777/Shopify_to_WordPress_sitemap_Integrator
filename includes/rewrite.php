@@ -11,8 +11,8 @@ function shopify_sitemap_add_rewrite_rules()
   // Get the filename from options or use default
   $filename = get_option('shopify_sitemap_output_filename', SHOPIFY_SITEMAP_DEFAULT_OUTPUT);
 
-  if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('Shopify Sitemap: Setting up rewrite rule for ' . $filename);
+  if (function_exists('shopify_sitemap_log')) {
+    shopify_sitemap_log('Setting up rewrite rule for ' . $filename);
   }
 
   // Add rewrite rule - PHP 8.1 safe with more explicit type checking
@@ -45,14 +45,14 @@ function shopify_sitemap_handle_request()
 {
   global $wp_query;
 
-  if (defined('WP_DEBUG') && WP_DEBUG) {
+  if (function_exists('shopify_sitemap_log')) {
     $query_var = isset($wp_query->query_vars['shopify_sitemap']) ? $wp_query->query_vars['shopify_sitemap'] : 'not set';
-    error_log('Shopify Sitemap: Template redirect check - shopify_sitemap var: ' . $query_var);
+    shopify_sitemap_log('Template redirect check - shopify_sitemap var: ' . $query_var);
   }
 
   if (isset($wp_query->query_vars['shopify_sitemap']) && $wp_query->query_vars['shopify_sitemap'] == '1') {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-      error_log('Shopify Sitemap: Handling sitemap request');
+    if (function_exists('shopify_sitemap_log')) {
+      shopify_sitemap_log('Handling sitemap request');
     }
 
     // Check if the function exists to prevent PHP errors
@@ -60,8 +60,8 @@ function shopify_sitemap_handle_request()
       // Output the XML
       $xml = shopify_sitemap_generate_xml();
 
-      if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Shopify Sitemap: XML generated, length: ' . strlen($xml));
+      if (function_exists('shopify_sitemap_log')) {
+        shopify_sitemap_log('XML generated, length: ' . strlen($xml));
       }
 
       // Set the header
@@ -72,8 +72,8 @@ function shopify_sitemap_handle_request()
       exit;
     } else {
       // If function doesn't exist, log an error
-      if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Shopify Sitemap: ERROR - shopify_sitemap_generate_xml function not found');
+      if (function_exists('shopify_sitemap_log')) {
+        shopify_sitemap_log('ERROR - shopify_sitemap_generate_xml function not found');
       }
 
       // Output a basic error XML

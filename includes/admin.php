@@ -182,12 +182,20 @@ function shopify_sitemap_admin_actions()
     $nonce = sanitize_text_field(wp_unslash($_GET['_wpnonce']));
 
     if (wp_verify_nonce($nonce, 'shopify_sitemap_update')) {
+      if (function_exists('shopify_sitemap_log')) {
+        shopify_sitemap_log('Manual update requested');
+      }
+
       // Delete existing transient data
       delete_transient('shopify_sitemap_data');
       delete_transient('shopify_sitemap_is_index');
 
       // Run update function from sitemap.php
       $updated = function_exists('shopify_sitemap_update') ? shopify_sitemap_update() : false;
+
+      if (function_exists('shopify_sitemap_log')) {
+        shopify_sitemap_log('Manual update result: ' . ($updated ? 'success' : 'failed'));
+      }
 
       // Redirect back with status
       $redirect = add_query_arg(array(
@@ -199,4 +207,58 @@ function shopify_sitemap_admin_actions()
       exit;
     }
   }
+}
+
+// Add debug tab for local environments
+add_action('admin_init', 'shopify_sitemap_maybe_add_debug_tab');
+function shopify_sitemap_maybe_add_debug_tab()
+{
+  // Check if we're on a local environment
+  $domain = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+  $is_local = (
+    strpos($domain, '.local') !== false ||
+    strpos($domain, 'localhost') !== false ||
+    strpos($domain, '.test') !== false ||
+    strpos($domain, '.dev') !== false ||
+    $domain === '127.0.0.1'
+  );
+
+  // Only add the debug tab on local environments and for admin users
+  if ($is_local && current_user_can('manage_options')) {
+    // Register a new settings section for debugging
+    add_settings_section(
+      'shopify_sitemap_debug',
+      'Debug Information (Local Environment Only)',
+      'shopify_sitemap_debug_section_text',
+      'shopify_sitemap_settings'
+    );
+  }
+}
+
+// Debug section text
+function shopify_sitemap_debug_section_text()
+{
+  // Display server information
+  echo '<div class="shopify-sitemap-debug-info" style="background: #f8f8f8; padding: 10px; border: 1px solid #ddd;">';
+  echo '<h3>Server Environment</h3>';
+  echo '<ul>';
+  echo '<li><strong>PHP Version:</strong> ' . PHP_VERSION . '</li>';
+  echo '<li><strong>WordPress Version:</strong> ' . get_bloginfo('version') . '</li>';
+  echo '<li><strong>Plugin Version:</strong> ' . SHOPIFY_SITEMAP_VERSION . '</li>';
+  echo '<li><strong>Server:</strong> ' . (isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : 'Unknown') . '</li>';
+  echo '</ul>';
+
+  // Display transient data status
+  echo '<h3>Sitemap Data Status</h3>';
+  $data_exists = get_transient('shopify_sitemap_data') !== false;
+  $is_index = get_transient('shopify_sitemap_is_index');
+
+  echo '<ul>';
+  echo '<li><strong>Data in Transient:</strong> ' . ($data_exists ? 'Yes' : 'No') . '</li>';
+  echo '<li><strong>Is Sitemap Index:</strong> ' . ($is_index ? 'Yes' : 'No') . '</li>';
+  echo '</ul>';
+
+  // Add manual debug button
+  echo '<p><a href="' . esc_url(wp_nonce_url(admin_url('options-general.php?page=shopify-sitemap&action=debug_log'), 'shopify_sitemap_debug')) . '" class="button">Generate Debug Log</a></p>';
+  echo '</div>';
 }
