@@ -35,6 +35,7 @@ function shopify_sitemap_activate()
   // Default settings
   add_option('shopify_sitemap_path', 'sitemap.xml');
   add_option('shopify_sitemap_output_filename', SHOPIFY_SITEMAP_DEFAULT_OUTPUT);
+  add_option('shopify_sitemap_flatten', 'no');
 
   // Add rewrite rules
   shopify_sitemap_add_rewrite_rules();
@@ -104,9 +105,10 @@ function shopify_sitemap_display_url()
   // Check if the sitemap transient exists
   $has_data = get_transient('shopify_sitemap_data') !== false;
   $is_index = get_transient('shopify_sitemap_is_index');
+  $flatten = get_option('shopify_sitemap_flatten', 'no') === 'yes';
 
   if ($has_data) {
-    if ($is_index) {
+    if ($is_index && !$flatten) {
       $status_html = '<span style="color: green;">✓ Sitemap index data is available</span>';
     } else {
       $status_html = '<span style="color: green;">✓ Sitemap data is available</span>';
@@ -115,20 +117,28 @@ function shopify_sitemap_display_url()
     $status_html = '<span style="color: orange;">⚠ No sitemap data yet. Try clicking "Update Sitemap Now" below.</span>';
   }
 
+  $note = '';
+  if ($is_index && !$flatten) {
+    $note = '<p><strong>Note:</strong> Your Shopify site is using a sitemap index file which contains links to multiple sitemaps.</p>';
+  } elseif ($is_index && $flatten) {
+    $note = '<p><strong>Note:</strong> Your Shopify site uses a sitemap index, but you\'ve chosen to flatten it into a single sitemap.</p>';
+  }
+
   return sprintf(
     '<div class="notice notice-info">
     <p>Your sitemap is available at: <a href="%1$s" target="_blank">%1$s</a><br>
     Status: %2$s</p>
-    <p><strong>Note:</strong> Your Shopify site is using a sitemap index file which contains links to multiple sitemaps.</p>
+    %3$s
     <p><strong>Troubleshooting:</strong> If your sitemap doesn\'t work, try these steps:</p>
     <ol>
       <li>Make sure your Shopify domain and sitemap path are correct</li>
-      <li>Visit the <a href="%3$s">Permalinks page</a> and click "Save Changes" to refresh rewrite rules</li>
+      <li>Visit the <a href="%4$s">Permalinks page</a> and click "Save Changes" to refresh rewrite rules</li>
       <li>Click "Update Sitemap Now" below to manually fetch the sitemap</li>
     </ol>
   </div>',
     esc_url($sitemap_url),
     $status_html,
+    $note,
     admin_url('options-permalink.php')
   );
 }
@@ -142,4 +152,19 @@ function shopify_sitemap_flush_rules()
     error_log('Shopify Sitemap: Permalink structure changed, flushing rules');
   }
   flush_rewrite_rules();
+}
+
+// Add "Settings" link to plugins page
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'shopify_sitemap_plugin_action_links');
+function shopify_sitemap_plugin_action_links($links)
+{
+  $settings_link = '<a href="' . admin_url('options-general.php?page=shopify-sitemap') . '">' . __('Settings', 'shopify-to-wordpress-sitemap') . '</a>';
+
+  // Get the sitemap URL
+  $output_filename = get_option('shopify_sitemap_output_filename', SHOPIFY_SITEMAP_DEFAULT_OUTPUT);
+  $sitemap_url = home_url('/' . $output_filename);
+  $sitemap_link = '<a href="' . esc_url($sitemap_url) . '" target="_blank">' . __('View Sitemap', 'shopify-to-wordpress-sitemap') . '</a>';
+
+  array_unshift($links, $settings_link, $sitemap_link);
+  return $links;
 }

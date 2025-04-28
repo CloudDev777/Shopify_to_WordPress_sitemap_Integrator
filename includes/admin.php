@@ -71,6 +71,15 @@ function shopify_sitemap_register_settings()
     )
   );
 
+  register_setting(
+    'shopify_sitemap_settings',
+    'shopify_sitemap_flatten',
+    array(
+      'sanitize_callback' => 'sanitize_text_field',
+      'default' => 'no',
+    )
+  );
+
   add_settings_section(
     'shopify_sitemap_general',
     'General Settings',
@@ -98,6 +107,14 @@ function shopify_sitemap_register_settings()
     'shopify_sitemap_output_filename',
     'Output Filename',
     'shopify_sitemap_output_field',
+    'shopify_sitemap_settings',
+    'shopify_sitemap_general'
+  );
+
+  add_settings_field(
+    'shopify_sitemap_flatten',
+    'Flatten Sitemap',
+    'shopify_sitemap_flatten_field',
     'shopify_sitemap_settings',
     'shopify_sitemap_general'
   );
@@ -133,6 +150,15 @@ function shopify_sitemap_output_field()
   echo '<p class="description">The filename for the generated sitemap (default: store.xml)</p>';
 }
 
+// Flatten sitemap field
+function shopify_sitemap_flatten_field()
+{
+  $flatten = get_option('shopify_sitemap_flatten', 'no');
+  echo '<label><input type="radio" name="shopify_sitemap_flatten" value="yes" ' . checked('yes', $flatten, false) . ' /> Yes</label>';
+  echo ' <label><input type="radio" name="shopify_sitemap_flatten" value="no" ' . checked('no', $flatten, false) . ' /> No</label>';
+  echo '<p class="description">For smaller websites, you can flatten the sitemap index into a single sitemap containing all URLs. This will fetch and combine all linked sitemaps.</p>';
+}
+
 // Handle admin actions
 add_action('admin_init', 'shopify_sitemap_admin_actions');
 function shopify_sitemap_admin_actions()
@@ -146,6 +172,10 @@ function shopify_sitemap_admin_actions()
     $nonce = sanitize_text_field(wp_unslash($_GET['_wpnonce']));
 
     if (wp_verify_nonce($nonce, 'shopify_sitemap_update')) {
+      // Delete existing transient data
+      delete_transient('shopify_sitemap_data');
+      delete_transient('shopify_sitemap_is_index');
+
       // Run update function from sitemap.php
       $updated = shopify_sitemap_update();
 

@@ -16,6 +16,7 @@ function shopify_sitemap_generate_xml()
 
   $sitemap_data = get_transient('shopify_sitemap_data');
   $is_index = get_transient('shopify_sitemap_is_index');
+  $flatten = get_option('shopify_sitemap_flatten', 'no') === 'yes';
 
   if (empty($sitemap_data)) {
     if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -41,7 +42,7 @@ function shopify_sitemap_generate_xml()
   header('Content-Type: application/xml; charset=UTF-8');
   ob_start();
 
-  if ($is_index) {
+  if ($is_index && !$flatten) {
     // Output sitemap index
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -116,9 +117,11 @@ function shopify_sitemap_update()
 {
   $domain = get_option('shopify_sitemap_domain', '');
   $path = get_option('shopify_sitemap_path', 'sitemap.xml');
+  $flatten = get_option('shopify_sitemap_flatten', 'no') === 'yes';
 
   if (defined('WP_DEBUG') && WP_DEBUG) {
     error_log('Shopify Sitemap: Attempting to update sitemap from ' . $domain . '/' . $path);
+    error_log('Shopify Sitemap: Flatten option is: ' . ($flatten ? 'enabled' : 'disabled'));
   }
 
   if (empty($domain)) {
@@ -167,15 +170,43 @@ function shopify_sitemap_update()
   $is_index = false;
   if (strpos($xml, '<sitemapindex') !== false) {
     $is_index = true;
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Detected sitemap index');
+    }
   }
+
+  // Store whether this is an index
+  set_transient('shopify_sitemap_is_index', $is_index, DAY_IN_SECONDS);
 
   // Parse the XML accordingly
   if ($is_index) {
     $sitemap_data = shopify_sitemap_parse_index($xml);
-    set_transient('shopify_sitemap_is_index', true, DAY_IN_SECONDS);
+
+    if ($flatten && !empty($sitemap_data)) {
+      if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Shopify Sitemap: Flattening sitemap index with ' . count($sitemap_data) . ' sitemaps');
+      }
+
+      // Fetch and parse all linked sitemaps
+      $flattened_urls = shopify_sitemap_flatten_index($sitemap_data);
+
+      if (!empty($flattened_urls)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+          error_log('Shopify Sitemap: Successfully flattened to ' . count($flattened_urls) . ' URLs');
+        }
+
+        // Store flattened data
+        set_transient('shopify_sitemap_data', $flattened_urls, DAY_IN_SECONDS);
+        return true;
+      } else {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+          error_log('Shopify Sitemap: Failed to flatten sitemap index');
+        }
+        return false;
+      }
+    }
   } else {
     $sitemap_data = shopify_sitemap_parse_sitemap($xml);
-    set_transient('shopify_sitemap_is_index', false, DAY_IN_SECONDS);
   }
 
   if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -195,6 +226,65 @@ function shopify_sitemap_update()
     error_log('Shopify Sitemap: Failed to set transient - no sitemap data found');
   }
   return false;
+}
+
+/**
+ * Flatten a sitemap index by fetching all linked sitemaps.
+ */
+function shopify_sitemap_flatten_index($sitemap_entries)
+{
+  $all_urls = array();
+
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Starting flattening of ' . count($sitemap_entries) . ' sitemaps');
+  }
+
+  foreach ($sitemap_entries as $sitemap) {
+    if (empty($sitemap['loc'])) {
+      continue;
+    }
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+      error_log('Shopify Sitemap: Fetching linked sitemap: ' . $sitemap['loc']);
+    }
+
+    // Fetch the linked sitemap
+    $response = wp_remote_get($sitemap['loc'], array(
+      'timeout' => 30,
+      'user-agent' => 'WordPress/Shopify-Sitemap-Integrator'
+    ));
+
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+      if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Shopify Sitemap: Failed to fetch linked sitemap: ' . $sitemap['loc']);
+      }
+      continue;
+    }
+
+    $xml = wp_remote_retrieve_body($response);
+
+    if (empty($xml)) {
+      continue;
+    }
+
+    // Parse the sitemap
+    $urls = shopify_sitemap_parse_sitemap($xml);
+
+    if (!empty($urls)) {
+      if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Shopify Sitemap: Found ' . count($urls) . ' URLs in linked sitemap');
+      }
+
+      // Add URLs to the combined array
+      $all_urls = array_merge($all_urls, $urls);
+    }
+  }
+
+  if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('Shopify Sitemap: Total flattened URLs: ' . count($all_urls));
+  }
+
+  return $all_urls;
 }
 
 /**
